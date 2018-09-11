@@ -1,0 +1,312 @@
+/** **************************************************************************
+ *  Copyright (C) 2010 Alexander Wunschik, IT-Solutions <dev@wunschik.it>
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU Affero General Public License as
+ *  published by the Free Software Foundation, either version 3 of the
+ *  License, or (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU Affero General Public License for more details.
+ *
+ *  You should have received a copy of the GNU Affero General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+class GaugeChart {
+
+	int width;
+	int height;
+	
+	boolean error = false;
+
+	int x = 0;
+	int y = 0;
+	int diameter = 0;
+	int radius = 0;
+	
+	int INDICATOR_ARROW = 1;
+	int INDICATOR_NEEDLE = 2;
+	
+	int indicator = INDICATOR_ARROW;
+
+	float value = 50.0;
+	float minValue = 100.0;
+	float maxValue = 0.0;
+	float targetValue = 50.0;
+	
+	float ANIMATE_SLOW = 0.1;
+    float ANIMATE_NORM = 0.2;
+    float ANIMATE_FAST = 0.3;
+
+	float animationSpeed = ANIMATE_NORM;
+
+	//PShape bg;
+
+	boolean showAnimation = true;
+	boolean showNeedle = true;
+	boolean showValueText = true;
+	boolean showMinIndicator = true;
+	boolean showMaxIndicator = true;
+
+	float gaugeStartMed = 0.25;
+	float gaugeStartMax = 0.75;
+
+	color backgroundColor = color(255, 255, 255);
+
+	color scalaColor1 = color(80, 80, 80);
+	color scalaColor2 = color(180, 180, 180);
+
+	color gaugeColorMin = color(220, 220, 220);
+	color gaugeColorMed = color(200, 200, 200);
+	color gaugeColorMax = color(20, 20, 100);
+
+	GaugeChart(int width, int height) {
+	    this.width = width;
+	    this.height = height
+	    
+	    x = int(width * 0.5);
+	    y = int(height * 0.95);
+	    
+	    diameter = int(width*0.75);
+	    radius = int(diameter/2); 
+	
+		//bg = loadShape("GaugeBackground.svg");
+	    frameRate(10);
+	    noLoop();
+	}
+
+	void draw() {
+		background(backgroundColor);
+		smooth();
+
+		//error handling
+		if ((width < 200) | (height < 100)) {
+			println("the resolution must be at least 200x100");
+			error = true;
+		}
+		if ( height*2 < width ) {
+			println("with a width of "+width+" the hight must be at least "+ceil(width/2)+" (2:1)");
+			error = true;
+		} 
+		if (error) {
+			stroke(0);
+			fill(255, 0, 0);
+			rect(0, 0, width, height);
+			stroke(50);
+			fill(50);
+			textSize(width*0.2);
+			textAlign(CENTER);
+			text("error", width/2, height/2);
+			noLoop();
+			return;
+		}
+
+		//shape(bg, 0, 0, width, height);
+
+	    //scala
+		stroke(scalaColor1);
+		for (int n=0; n<=100; n+=10) {
+			float arcValue = map(n, 0, 100, PI, TWO_PI);  
+			int xValue = x + int(cos(arcValue)*(radius*1.07));
+			int yValue = y + int(sin(arcValue)*(radius*1.07));     
+			line(x, y, xValue, yValue);
+		}
+		stroke(scalaColor1);
+		for (int n=5; n<=100; n+=10) {
+			float arcValue = map(n, 0, 100, PI, TWO_PI);  
+			int xValue = x + int(cos(arcValue)*(radius*1.04));
+			int yValue = y + int(sin(arcValue)*(radius*1.04));     
+			line(x, y, xValue, yValue);
+		}
+
+		//scala text
+		stroke(scalaColor1);
+		fill(scalaColor1);
+		textSize(width*0.024);
+		textAlign(CENTER);
+		text("0%", x + int(cos(PI)*(radius*1.14)), y + int(sin(PI)*(radius*1.14)));
+		for (int n=25; n<=75; n+=25) {
+			float arcValue = map(n, 0, 100, PI, TWO_PI);  
+			int xValue = x + int(cos(arcValue)*(radius*1.1));
+			int yValue = y + int(sin(arcValue)*(radius*1.1));     
+			text(n+"%", xValue, yValue);
+		}
+		text("100%", x + int(cos(TWO_PI)*(radius*1.17)), y + int(sin(TWO_PI)*(radius*1.17)));
+  
+		//gauge background
+		noStroke();
+		stroke(scalaColor2);
+		fill(gaugeColorMin);
+		arc(x, y, diameter, diameter, PI, PI+PI*gaugeStartMed+0.01);
+		//fill(0,255,0);
+		fill(gaugeColorMed);
+		arc(x, y, diameter, diameter, PI+PI*gaugeStartMed-0.005, PI+PI*gaugeStartMax+0.01);
+		//fill(255,0,0);
+		fill(gaugeColorMax);
+		arc(x, y, diameter, diameter, PI+PI*gaugeStartMax-0.005, TWO_PI);
+		fill(backgroundColor);
+		stroke(scalaColor2);
+		arc(x, y+2, diameter*0.65, diameter*0.65, PI, TWO_PI);
+
+		//value text
+		if (showValueText) {
+			stroke(scalaColor1);		
+			fill(scalaColor2);		
+			rect(x-width*0.07,height*0.7-height*0.05, width*0.14, height*0.1)
+			stroke(scalaColor1);		
+			fill(scalaColor1);
+			textSize(width*0.026);
+			textAlign(CENTER);
+			
+			if (value <= 0.0)
+				text("0.0%", x, height*0.72);
+			else
+				text(floor(value)+"."+floor(value%floor(value)*10)+"%", x, height*0.72);
+		}
+
+		//min value needle
+		if (showMinIndicator) {
+			stroke(200, 0, 0, 150);
+			strokeWeight(1); 
+			float arcValue = map(minValue, 0.0, 100.0, PI, TWO_PI);  
+			int xStartValue = x + int(cos(arcValue)*radius*0.65);
+			int yStartValue = y + int(sin(arcValue)*radius*0.65); 
+			int xEndValue = x + int(cos(arcValue)*radius*1);
+			int yEndValue = y + int(sin(arcValue)*radius*1);     
+			line(xStartValue, yStartValue, xEndValue, yEndValue);
+		}
+
+		//max value needle
+		if (showMaxIndicator) {
+			stroke(0, 200, 0, 150);
+			strokeWeight(1); 
+			float arcValue = map(maxValue, 0.0, 100.0, PI, TWO_PI);  
+			int xStartValue = x + int(cos(arcValue)*radius*0.65);
+			int yStartValue = y + int(sin(arcValue)*radius*0.65); 
+			int xEndValue = x + int(cos(arcValue)*radius*1);
+			int yEndValue = y + int(sin(arcValue)*radius*1);     
+			line(xStartValue, yStartValue, xEndValue, yEndValue);
+		}
+
+		//needle  
+		float arcValue = map(value, 0.0, 100.0, PI, TWO_PI);  
+		int xStartValue	= x;	
+		int yStartValue = y;
+		if (!showNeedle) { 
+			xStartValue = x + int(cos(arcValue)*radius*0.65);
+			yStartValue = y + int(sin(arcValue)*radius*0.65); 
+		} 
+		int xEndValue = x + int(cos(arcValue)*(radius*0.98));
+		int yEndValue = y + int(sin(arcValue)*(radius*0.98));
+
+		if (indicator == INDICATOR_ARROW) {
+
+			//arrow
+			noStroke();
+			fill(scalaColor2, 180);
+			triangle(
+				xStartValue-sin(arcValue-PI)*diameter*0.018, 
+				yStartValue+cos(arcValue-PI)*diameter*0.018, 
+				xStartValue, yStartValue, 
+				xEndValue, yEndValue);
+			noStroke();
+			fill(scalaColor1, 180);
+			triangle(
+				xStartValue+sin(arcValue-PI)*diameter*0.018, 
+				yStartValue-cos(arcValue-PI)*diameter*0.018, 
+				xStartValue, yStartValue,
+				xEndValue, yEndValue);
+		
+		} else {
+
+    		//needle
+			if (showNeedle) {
+				stroke(20, 180);	
+			} else {		
+				stroke(50, 180);
+			}
+			strokeWeight(4);
+			line(xStartValue, yStartValue, xEndValue, yEndValue);
+		
+		}
+
+		//needle pin
+		if (showNeedle) { 
+			noStroke();
+			fill(scalaColor1);
+			ellipse(x, y, diameter*0.05,  diameter*0.05);
+			fill(scalaColor2);
+			ellipse(x, y, diameter*0.04,  diameter*0.04);
+			fill(scalaColor1);
+			ellipse(x, y, diameter*0.01,  diameter*0.01);
+		} else {
+			fill(backgroundColor);
+			stroke(backgroundColor);
+			rect(x-diameter/2, y, diameter, height*0.03);
+		}
+
+		//neddle animation
+		if (value < targetValue) {
+			value += abs(value-targetValue)*animationSpeed;
+		} else if (value > targetValue) {
+			value -= abs(value-targetValue)*animationSpeed;
+		} else if (value == targetValue) {
+			noLoop();
+		}
+
+		//stop needle animation
+		if (( abs(value-targetValue) < animationSpeed ) | (!showAnimation)) {
+			value = targetValue;
+		}
+
+		//set max value
+		if (maxValue < value) {
+			maxValue = value;
+		}
+
+		//set min value
+		if (minValue > value) {
+			minValue = value;
+		}
+	}
+
+	void setValue(float newValue) {
+		if (newValue < 0.0)
+			newValue = 0.0;
+		else if (newValue > 100.0)
+			newValue = 100.0;
+
+		targetValue = newValue;
+
+		loop();
+	}
+
+	void resetMaxValue() {
+		maxValue = value;
+	}
+	
+	void setShowAnimation(boolean value) { showAnimation = value; }	
+	void setShowNeedle(boolean value) { showNeedle = value; }	
+	void setShowValueText(boolean value) { showValueText = value; }	
+	void setShowMinIndicator(boolean value) { showMinIndicator = value; }	
+	void setShowMaxIndicator(boolean value) { showMaxIndicator = value; }	
+
+}
+
+GaugeChart gauge;
+
+void setup() {
+	gauge = new GaugeChart(width, height);
+	gauge.setValue(37.7);
+}
+
+void draw() {
+	gauge.draw(); 
+}
+
+void mousePressed() {
+	gauge.setValue(random(0, 100));
+}
